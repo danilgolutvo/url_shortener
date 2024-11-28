@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"github.com/gorilla/mux"
 	"log/slog"
+	"net/http"
 	"os"
+	"url_shortener/cmd/middleware"
 	"url_shortener/internal/config"
 	"url_shortener/internal/lib/logger/sl"
 	"url_shortener/internal/storage/postgres"
@@ -40,6 +44,19 @@ func main() {
 	log.Info("Database initialized successfully")
 
 	// TODO: init router - library - chi, chi"render" or gorilla
+	router := mux.NewRouter()
+
+	// middleware that attaches uniq id to a request
+	router.Use(middleware.RequestID)
+	router.Use(middleware.Logger)
+
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Retrieve the request ID from the context
+		reqID := middleware.GetReqID(r.Context())
+		fmt.Fprintf(w, "Hello, your request ID is: %s\n", reqID)
+	})
+	slog.Info("Starting server", slog.String("address", ":8084"))
+	http.ListenAndServe(":8084", router)
 
 	// TODO: run server
 }

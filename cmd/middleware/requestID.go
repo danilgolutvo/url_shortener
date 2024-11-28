@@ -16,9 +16,10 @@ const RequestIDKey ctxKeyRequestID = 0
 // Exported so that it can be changed by developers
 var RequestIDHeader = "X-Request-Id"
 
-var prefix = "uniquePrefix"
+var prefix = "prefix"
 var reqid uint64
 
+// RequestID is used to attach unique id to every request
 func RequestID(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -33,6 +34,7 @@ func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
+// GetReqID is used to extract value of RequestIDKey
 func GetReqID(ctx context.Context) string {
 	if ctx == nil {
 		return ""

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"log/slog"
 	"net/http"
@@ -48,15 +49,16 @@ func main() {
 
 	// middleware that attaches uniq id to a request
 	router.Use(middleware.RequestID)
-	router.Use(middleware.Logger)
+	router.Use(middleware.LoggingMiddleware)
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Retrieve the request ID from the context
 		reqID := middleware.GetReqID(r.Context())
 		fmt.Fprintf(w, "Hello, your request ID is: %s\n", reqID)
 	})
+
 	slog.Info("Starting server", slog.String("address", ":8084"))
-	http.ListenAndServe(":8084", router)
+	http.ListenAndServe(":8084", handlers.RecoveryHandler()(router))
 
 	// TODO: run server
 }

@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"os"
 	"url_shortener/cmd/middleware"
+	"url_shortener/httpServer/handlers/deleteURL"
+	"url_shortener/httpServer/handlers/redirect"
+	"url_shortener/httpServer/handlers/url/save"
 	"url_shortener/internal/config"
 	"url_shortener/internal/lib/logger/sl"
 	"url_shortener/internal/storage/postgres"
@@ -31,7 +34,11 @@ func main() {
 	// make setupLogger func that defines which env i'm in to create a logger with corresponding Level, create log.Info with two args, the latter is for understanding which env I'm currently in
 
 	log := setupLogger(cfg.Env)
-	log.Info("starting url_shortener", slog.String("env", cfg.Env))
+	log.Info(
+		"starting url_shortener",
+		slog.String("env", cfg.Env),
+		slog.String("version", "123"),
+	)
 	log.Debug("debug messages are enabled")
 
 	// TODO: init storage - library - postgres or SQLite
@@ -51,14 +58,38 @@ func main() {
 	router.Use(middleware.RequestID)
 	router.Use(middleware.LoggingMiddleware)
 
+	router.Handle("/url", save.New(log, storage)).Methods(http.MethodPost)
+	router.Handle("/{alias}", redirect.New(log, storage)).Methods(http.MethodGet)
+	router.Handle("/{alias}", deleteURL.New(log, storage)).Methods(http.MethodPost)
+
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Retrieve the request ID from the context
 		reqID := middleware.GetReqID(r.Context())
 		fmt.Fprintf(w, "Hello, your request ID is: %s\n", reqID)
 	})
+	recoveryHandler := handlers.RecoveryHandler(
+		handlers.PrintRecoveryStack(true), // Print stack trace to logs
+		handlers.RecoveryLogger(slog.NewLogLogger(
+			slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}), // Log to stdout
+			slog.LevelError, // Log level for errors
+		)),
+	)(router)
 
-	slog.Info("Starting server", slog.String("address", ":8084"))
-	http.ListenAndServe(":8084", handlers.RecoveryHandler()(router))
+	slog.Info("Starting server", slog.String("address", cfg.HTTPServer.Address))
+
+	srv := &http.Server{
+		Addr:         cfg.HTTPServer.Address,
+		Handler:      recoveryHandler,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("failed to start server")
+	}
+
+	log.Error("SHOULD NOT SEE THIS MESSAGE")
 
 	// TODO: run server
 }

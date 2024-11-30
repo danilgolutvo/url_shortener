@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/handlers"
 )
 
-// LoggingMiddleware wraps the gorilla/handlers logging functionality to add custom fields.
+// LoggingMiddleware wraps the gorilla/myhandlers logging functionality to add custom fields.
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return handlers.CustomLoggingHandler(log.Writer(), next, logFormatter)
 }

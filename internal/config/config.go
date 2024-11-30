@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	Env        string `yaml:"env" env-default:"local" env-required:"true"`
-	Dsn        string `yaml:"dsn" env-required:"true"`
-	HTTPServer `yaml:"http_server"`
+	Env         string `yaml:"env" env-default:"local" env-required:"true"`
+	Dsn         string `yaml:"dsn" env-required:"true"`
+	AliasLength int    `yaml:"aliasLength" env-default:"6"`
+	HTTPServer  `yaml:"http_server"`
 }
 type HTTPServer struct {
 	Address     string        `yaml:"address" env-default:"localhost:8080"`
@@ -21,7 +22,7 @@ type HTTPServer struct {
 func MustLoad() *Config {
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
-		log.Fatal("CONFIG_PATH is not set")
+		configPath = "/Users/dangolutvo/Documents/GitHub/url_shortener/config/local.yaml"
 	}
 	// check if file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {

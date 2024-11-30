@@ -99,15 +99,51 @@ func (s *Storage) GetURL(alias string) (string, error) {
 	return url, nil
 }
 
-func (s *Storage) DeleteURL(alias string) error {
+func (s *Storage) DeleteURL(alias string) (bool, error) {
 	const info = "storage.postgres.DeleteURL"
-	stmt := `DELETE url FROM url WHERE alias = $1`
+	ok, _ := s.CaseDifferent(alias)
+	if ok {
+		return ok, fmt.Errorf("no such alias, %s, %s", info, alias)
+	}
+
+	stmt := `DELETE FROM url WHERE alias = $1`
 	_, err := s.DB.Exec(context.Background(), stmt, alias)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("%s: No rows found for the given alias", info)
+			return false, fmt.Errorf("%s: No rows found for the given alias", info)
 		}
-		return fmt.Errorf("%s: %w", info, err)
+		return false, fmt.Errorf("%s: %w", info, err)
 	}
-	return nil
+	return false, nil
+}
+
+func (s *Storage) CaseDifferent(alias string) (bool, error) {
+	const info = "storage.postgres.Exists"
+	stmt := `SELECT alias FROM url WHERE alias = $1`
+	var aliasToCheck string
+	err := s.DB.QueryRow(context.Background(), stmt, alias).Scan(&aliasToCheck)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, fmt.Errorf("%s: No rows found for the given alias", info)
+		}
+		return false, fmt.Errorf("%s: %w", info, err)
+	}
+	ok, _ := compareCaseSensitive(alias, aliasToCheck)
+	return ok, nil
+}
+
+func compareCaseSensitive(str1, str2 string) (bool, error) {
+	// Check if lengths are the same
+	if len(str1) != len(str2) {
+		return false, errors.New("strings have different lengths")
+	}
+
+	// Compare each character in both strings
+	for i := 0; i < len(str1); i++ {
+		if str1[i] != str2[i] {
+			return false, fmt.Errorf("case mismatch at position %d: '%c' != '%c'", i, str1[i], str2[i])
+		}
+	}
+
+	return true, nil
 }

@@ -15,6 +15,7 @@ import (
 	"url_shortener/httpServer/handlers/register"
 	"url_shortener/httpServer/handlers/url/save"
 	"url_shortener/internal/config"
+	"url_shortener/internal/lib/logger/handlers/slogpretty"
 	"url_shortener/internal/lib/logger/sl"
 	"url_shortener/internal/storage/postgres"
 )
@@ -82,7 +83,7 @@ func main() {
 		)),
 	)(router)
 
-	slog.Info("Starting server", slog.String("address", cfg.HTTPServer.Address))
+	log.Info("Starting server", slog.String("address", cfg.HTTPServer.Address))
 
 	srv := &http.Server{
 		Addr:         cfg.HTTPServer.Address,
@@ -103,14 +104,35 @@ func main() {
 
 func setupLogger(env string) *slog.Logger {
 	var log *slog.Logger
-	if env == envLocal {
-		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	switch env {
+	case envLocal:
+		log = setupPrettySlog()
+	case envDev:
+		log = slog.New(
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
+		)
+	case envProd:
+		log = slog.New(
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
+		)
+	default: // If env config is invalid, set prod settings by default due to security
+		log = slog.New(
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
+		)
 	}
-	if env == envDev {
-		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	}
-	if env == envProd {
-		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	}
+
 	return log
+}
+
+func setupPrettySlog() *slog.Logger {
+	opts := slogpretty.PrettyHandlerOptions{
+		SlogOpts: &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	}
+
+	handler := opts.NewPrettyHandler(os.Stdout)
+
+	return slog.New(handler)
 }

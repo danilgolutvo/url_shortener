@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func createToken(userID, username string) (string, error) {
+func CreateToken(userID, username string) (string, error) {
 	claims := jwt.MapClaims{}
 	claims["user_id"] = userID
 	claims["username"] = username

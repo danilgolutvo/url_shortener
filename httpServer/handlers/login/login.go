@@ -18,6 +18,7 @@ type User struct {
 	Password string `json:"password"`
 }
 
+//go:generate go run github.com/vektra/mockery/v2@v2.49.1 --name=LoginHandler --output=url_shortener/test
 type LoginHandler interface {
 	GetUserByUsername(username string) (User, error)
 }
@@ -33,16 +34,18 @@ func HandleLogin(log *slog.Logger, logingHandler LoginHandler) http.HandlerFunc 
 
 		var loginReq User
 		if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
-			log.Info("could not decode body")
+			log.Error("could not decode request body", slog.String("error", err.Error()))
+			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.Error("could not decode"))
 			return
 		}
 		user, err := logingHandler.GetUserByUsername(loginReq.Username)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				log.Info("did not find user")
-				render.JSON(w, r, resp.Error("did not find user"))
-				http.Error(w, "invalid username or password", http.StatusUnauthorized)
+				log.Error("found no rows", slog.String("error", err.Error()))
+				render.Status(r, http.StatusUnauthorized)
+				render.JSON(w, r, resp.Error("invalid username or password"))
+				return
 			} else {
 				log.Info("server error")
 				render.JSON(w, r, resp.Error("server error"))
@@ -50,13 +53,17 @@ func HandleLogin(log *slog.Logger, logingHandler LoginHandler) http.HandlerFunc 
 			return
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginReq.Password)); err != nil {
-			http.Error(w, "invalid username or password", http.StatusUnauthorized)
+			log.Error("invalid username or password", slog.String("error", err.Error()))
+			render.Status(r, http.StatusUnauthorized)
+			render.JSON(w, r, resp.Error("invalid username or password"))
 			return
 		}
 
-		token, err := createToken(user.ID, user.Username)
+		token, err := CreateToken(user.ID, user.Username)
 		if err != nil {
-			http.Error(w, "server error", http.StatusInternalServerError)
+			log.Error("server error", slog.String("error", err.Error()))
+			render.Status(r, http.StatusInternalServerError)
+			render.JSON(w, r, resp.Error("invalid username or password"))
 			return
 		}
 

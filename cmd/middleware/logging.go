@@ -1,12 +1,11 @@
 package middleware
 
 import (
+	"github.com/gorilla/handlers"
 	"io"
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/gorilla/handlers"
 )
 
 // LoggingMiddleware wraps the gorilla/myhandlers logging functionality to add custom fields.

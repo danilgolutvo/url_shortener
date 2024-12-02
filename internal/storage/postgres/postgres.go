@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib" // init pgx driver
 	"golang.org/x/crypto/bcrypt"
-	"log"
 	"time"
 	"url_shortener/httpServer/handlers/login"
 	"url_shortener/internal/lib/logger/sl"
@@ -105,7 +104,6 @@ func (s *Storage) SaveURL(urlToSave, alias, creator string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%s: failed to insert entry: %w", info, err)
 	}
-	log.Printf("Entry created at: %s\n", createdAt)
 	return id, nil
 }
 

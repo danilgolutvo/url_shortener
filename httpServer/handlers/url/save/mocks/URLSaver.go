@@ -9,23 +9,23 @@ type URLSaver struct {
 	mock.Mock
 }
 
-// SaveURL provides a mock function with given fields: urlToSave, alias
-func (_m *URLSaver) SaveURL(urlToSave string, alias string) (int64, error) {
-	ret := _m.Called(urlToSave, alias)
+// SaveURL provides a mock function with given fields: urlToSave, alias, creator
+func (_m *URLSaver) SaveURL(urlToSave string, alias string, creator string) (string, error) {
+	ret := _m.Called(urlToSave, alias, creator)
 
-	var r0 int64
+	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string) (int64, error)); ok {
-		return rf(urlToSave, alias)
+	if rf, ok := ret.Get(0).(func(string, string, string) (string, error)); ok {
+		return rf(urlToSave, alias, creator)
 	}
-	if rf, ok := ret.Get(0).(func(string, string) int64); ok {
-		r0 = rf(urlToSave, alias)
+	if rf, ok := ret.Get(0).(func(string, string, string) string); ok {
+		r0 = rf(urlToSave, alias, creator)
 	} else {
-		r0 = ret.Get(0).(int64)
+		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(urlToSave, alias)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(urlToSave, alias, creator)
 	} else {
 		r1 = ret.Error(1)
 	}

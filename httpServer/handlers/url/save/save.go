@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"url_shortener/cmd/middleware"
+	"url_shortener/httpServer/handlers"
 	"url_shortener/httpServer/handlers/url/random"
 	"url_shortener/internal/config"
 	resp "url_shortener/internal/lib/api/response"
@@ -27,7 +28,7 @@ type Response struct {
 
 //go:generate go run github.com/vektra/mockery/v2@v2.28.2 --name=URLSaver
 type URLSaver interface {
-	SaveURL(urlToSave string, alias string) (int64, error)
+	SaveURL(urlToSave, alias, creator string) (string, error)
 }
 
 func New(log *slog.Logger, urlSaver URLSaver) http.HandlerFunc {
@@ -75,8 +76,14 @@ func New(log *slog.Logger, urlSaver URLSaver) http.HandlerFunc {
 		if alias == "" {
 			alias = random.RandomString(config.MustLoad().AliasLength)
 		}
+		creator, err := handlers.GetUserIDFromContext(r.Context())
+		if err != nil {
+			log.Error("could not get user id from context, unauthorized", sl.Err(err))
+			render.JSON(w, r, resp.Error("could not ger user id from context, unauthorized"))
+			return
+		}
 
-		id, err := urlSaver.SaveURL(req.URL, alias)
+		id, err := urlSaver.SaveURL(req.URL, alias, creator)
 		if errors.Is(err, storage.ErrURLExists) {
 			log.Info("url already exists", slog.String("url", req.URL))
 
@@ -92,7 +99,7 @@ func New(log *slog.Logger, urlSaver URLSaver) http.HandlerFunc {
 			return
 		}
 
-		log.Info("url added", slog.Int64("id", id))
+		log.Info("url added", slog.String("id", id))
 
 		responseOK(w, r, alias)
 	}

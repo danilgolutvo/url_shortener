@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"net/http"
 	"url_shortener/cmd/middleware"
+	"url_shortener/httpServer/handlers"
 	resp "url_shortener/internal/lib/api/response"
 	"url_shortener/internal/lib/logger/sl"
+	"url_shortener/internal/storage"
 )
 
 type Response struct {
@@ -18,7 +20,7 @@ type Response struct {
 }
 
 type URLRemover interface {
-	DeleteURL(alias string) (bool, error)
+	DeleteURL(alias, creator string) (bool, error)
 }
 
 func New(log *slog.Logger, urlRemover URLRemover) http.HandlerFunc {
@@ -37,23 +39,42 @@ func New(log *slog.Logger, urlRemover URLRemover) http.HandlerFunc {
 			render.JSON(w, r, resp.Error("invalid request"))
 			return
 		}
-		ok, err := urlRemover.DeleteURL(alias)
-		if !ok {
-			log.Info("alias is not written correctly")
-			render.JSON(w, r, resp.Error("case sensitivity problem"))
-			return
-		}
-		if errors.Is(err, errors.New("alias not found")) {
-			log.Info("alias not found", "alias", alias)
-			render.JSON(w, r, resp.Error("alias not found"))
-			return
-		}
+		creator, err := handlers.GetUserIDFromContext(r.Context())
 		if err != nil {
-			log.Error("failed to delete url", sl.Err(err))
+			log.Error("could not get user id from context, unauthorized", sl.Err(err))
+			render.JSON(w, r, resp.Error("could not ger user id from context, unauthorized"))
+			return
+		}
+		ok, err := urlRemover.DeleteURL(alias, creator)
+		if err != nil {
+			// Check for specific error types or sentinel errors
+			if errors.Is(err, storage.ErrAliasNotFound) {
+				log.Info("Alias not found", slog.String("alias", alias))
+				render.JSON(w, r, resp.Error("alias not found"))
+				return
+			}
+
+			// Handle other known errors if applicable
+			if errors.Is(err, storage.ErrCaseMismatch) {
+				log.Info("Alias has a case sensitivity issue", slog.String("alias", alias))
+				render.JSON(w, r, resp.Error("case sensitivity problem"))
+				return
+			}
+
+			// Fallback for unexpected errors
+			log.Error("Failed to delete URL", sl.Err(err))
 			render.JSON(w, r, resp.Error("internal error"))
 			return
 		}
-		log.Info("url successfully deleted", slog.String("alias", alias))
+
+		// Handle successful deletion
+		if !ok {
+			log.Info("Alias case mismatch prevented deletion", slog.String("alias", alias))
+			render.JSON(w, r, resp.Error("case sensitivity problem"))
+			return
+		}
+
+		log.Info("URL successfully deleted", slog.String("alias", alias))
 		responseOK(w, r, alias)
 	}
 }

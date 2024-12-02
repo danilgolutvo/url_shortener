@@ -10,7 +10,9 @@ import (
 	"os"
 	"url_shortener/cmd/middleware"
 	"url_shortener/httpServer/handlers/deleteURL"
+	"url_shortener/httpServer/handlers/login"
 	"url_shortener/httpServer/handlers/redirect"
+	"url_shortener/httpServer/handlers/register"
 	"url_shortener/httpServer/handlers/url/save"
 	"url_shortener/internal/config"
 	"url_shortener/internal/lib/logger/sl"
@@ -57,10 +59,15 @@ func main() {
 	// middleware that attaches uniq id to a request
 	router.Use(middleware.RequestID)
 	router.Use(middleware.LoggingMiddleware)
-
-	router.Handle("/url", save.New(log, storage)).Methods(http.MethodPost)
 	router.Handle("/{alias}", redirect.New(log, storage)).Methods(http.MethodGet)
-	router.Handle("/{alias}", deleteURL.New(log, storage)).Methods(http.MethodPost)
+	router.Handle("/login", login.HandleLogin(log, storage)).Methods(http.MethodPost)
+	router.Handle("/register", register.HandleRegistration(log, storage)).Methods(http.MethodPost)
+
+	privateRouter := router.PathPrefix("/").Subrouter()
+	privateRouter.Use(middleware.Auth)
+
+	privateRouter.Handle("/url", save.New(log, storage)).Methods(http.MethodPost)
+	privateRouter.Handle("/url/{alias}", deleteURL.New(log, storage)).Methods(http.MethodDelete)
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Retrieve the request ID from the context
